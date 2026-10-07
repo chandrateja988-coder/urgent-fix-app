@@ -1,0 +1,34 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Urgent Fix design tokens (Tailwind v4 theme variables).
+   These generate utilities such as bg-canvas, bg-brand, text-ink, border-brand.
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-canvas: #f7f5f0; /* app background - light neutral */
+  --color-brand: #0f6e56; /* primary - deep teal */
+  --color-brand-dark: #0b5343; /* primary hover */
+  --color-brand-soft: #e3efeb; /* subtle tint for accents */
+  --color-ink: #21252b; /* body text */
+  --color-ink-soft: #5c646d; /* muted text */
+  --color-line: #d9d5cd; /* control borders */
+
+  /* Success state - emerald tone, deliberately distinct from the teal brand */
+  --color-success: #059669; /* checkmark icon / accent */
+  --color-success-ink: #065f46; /* alert title and description text */
+  --color-success-soft: #ecfdf5; /* alert background */
+  --color-success-line: #a7f3d0; /* alert border */
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+  }
+}
