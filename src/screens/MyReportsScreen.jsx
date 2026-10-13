@@ -38,7 +38,7 @@ function ReportItem({ report }) {
  * My reports - loads the renter's saved reports back from the database
  * (React -> Python API -> Supabase) and lists them, newest first.
  */
-export default function MyReportsScreen({ email, onNewReport }) {
+export default function MyReportsScreen({ email, onNewReport, onSessionExpired }) {
   const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'error'
   const [reports, setReports] = useState([])
   const [errorMessage, setErrorMessage] = useState('')
@@ -49,7 +49,7 @@ export default function MyReportsScreen({ email, onNewReport }) {
 
     setStatus('loading')
 
-    loadReports(email)
+    loadReports()
       .then((data) => {
         if (cancelled) return
         setReports(Array.isArray(data) ? data : [])
@@ -57,6 +57,10 @@ export default function MyReportsScreen({ email, onNewReport }) {
       })
       .catch((error) => {
         if (cancelled) return
+        if (error.status === 401 && onSessionExpired) {
+          onSessionExpired()
+          return
+        }
         setErrorMessage(error.message)
         setStatus('error')
       })

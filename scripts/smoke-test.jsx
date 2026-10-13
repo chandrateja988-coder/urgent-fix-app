@@ -7,7 +7,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import App from '../src/App.jsx'
+import AppHeader from '../src/components/AppHeader.jsx'
 import SuccessAlert from '../src/components/SuccessAlert.jsx'
+import LoginScreen from '../src/screens/LoginScreen.jsx'
 import MyReportsScreen from '../src/screens/MyReportsScreen.jsx'
 import ConfirmationScreen from '../src/screens/ConfirmationScreen.jsx'
 import PropertyDetailsScreen from '../src/screens/PropertyDetailsScreen.jsx'
@@ -41,6 +43,30 @@ includes('Login screen has an email field', appHtml, 'type="email"')
 includes('Login screen has a password field', appHtml, 'type="password"')
 includes('Login screen renders the primary Button', appHtml, 'bg-brand')
 includes('Login screen renders a Card', appHtml, 'rounded-xl')
+includes('Login screen offers to create an account', appHtml, 'Create an account')
+includes('Login screen has a show-password option', appHtml, 'Show password')
+check('Nobody is logged in yet, so no Log out button', !appHtml.includes('Log out'), 'expected no Log out button')
+
+// Screen 1 in "Create account" mode (real accounts, checked by the Python API)
+const signUpHtml = renderToStaticMarkup(<LoginScreen onLogIn={() => {}} initialMode="signup" />)
+includes('Create account screen has a heading', signUpHtml, 'Create account')
+includes('Create account screen asks to confirm the password', signUpHtml, 'Confirm password')
+includes('Create account screen explains the password rule', signUpHtml, 'At least 8 characters, with a letter and a number.')
+includes('Create account screen tells the browser it is a new password', signUpHtml, 'new-password')
+includes('Create account screen links back to log in', signUpHtml, 'Already have an account?')
+check('Log in mode does not ask for a confirm password', !appHtml.includes('Confirm password'), 'expected no confirm field')
+
+const noticeHtml = renderToStaticMarkup(
+  <LoginScreen onLogIn={() => {}} notice="Your session has ended. Please log in again." />,
+)
+includes('Login screen can show a notice', noticeHtml, 'Your session has ended. Please log in again.')
+
+// Header: shows who is logged in and a Log out button
+const headerHtml = renderToStaticMarkup(
+  <AppHeader signedInAs="renter@example.com" onSignOut={() => {}} />,
+)
+includes('Header shows who is logged in', headerHtml, 'Signed in as renter@example.com')
+includes('Header has a Log out button', headerHtml, 'Log out')
 
 // Screen 2 - Report an issue
 const reportHtml = renderToStaticMarkup(

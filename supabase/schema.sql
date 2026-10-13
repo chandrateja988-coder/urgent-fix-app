@@ -1,4 +1,5 @@
 -- Run once in the Supabase SQL Editor to create the table the Python API writes to.
+-- (Accounts live in a second table: run supabase/auth.sql as well.)
 create table if not exists reports (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),

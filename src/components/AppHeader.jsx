@@ -2,7 +2,7 @@
  * AppHeader - slim app bar shown on every screen.
  * Displays the product name and, once inside the report flow, the current step.
  */
-export default function AppHeader({ currentStep = null, signedInAs = null }) {
+export default function AppHeader({ currentStep = null, signedInAs = null, onSignOut }) {
   return (
     <header className="border-b border-line/70 bg-white/80 backdrop-blur">
       <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
@@ -23,7 +23,18 @@ export default function AppHeader({ currentStep = null, signedInAs = null }) {
             <p className="text-xs font-medium text-ink-soft">Step {currentStep} of 3</p>
           )}
           {signedInAs && (
-            <p className="text-xs text-ink-soft/80">Signed in as {signedInAs}</p>
+            <p className="max-w-48 truncate text-xs text-ink-soft/80 sm:max-w-none">
+              Signed in as {signedInAs}
+            </p>
+          )}
+          {signedInAs && onSignOut && (
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="mt-0.5 text-xs font-semibold text-brand underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            >
+              Log out
+            </button>
           )}
         </div>
       </div>

@@ -1,7 +1,9 @@
 # Urgent Fix
 
-A full-stack MVP that lets a Victorian renter report an urgent repair. Reports are
-saved to a database and can be loaded back on the **My reports** screen.
+A full-stack MVP that lets a Victorian renter create an account, report an urgent repair
+and see their saved reports again on the **My reports** screen.
+
+Live app: https://urgent-fix-app.vercel.app
 
 ```
 React (browser)  ->  Python API (FastAPI)  ->  Supabase (Postgres)
@@ -9,8 +11,14 @@ React (browser)  ->  Python API (FastAPI)  ->  Supabase (Postgres)
 ```
 
 - **React** collects the report and only ever calls its own `/api/...` address.
-- **Python** (`api/index.py`) checks the data and is the *only* part that talks to Supabase.
-- **Supabase** stores the rows in a `reports` table (Row Level Security switched on).
+- **Python** (`api/index.py`) checks the data, handles accounts and sessions, and is the
+  *only* part that talks to Supabase.
+- **Supabase** stores the rows in two tables, `reports` and `app_users` (Row Level
+  Security switched on, with no public policies).
+- **Accounts:** a renter creates an account (email + password) or logs in. The password
+  is stored only as a salted `scrypt` hash, and the API returns a signed session token
+  (8 hours). Every `/api/reports` call needs that token, so a renter can only ever save or
+  read reports under their own email.
 - The Supabase secret key lives in environment variables (`.env` locally, Vercel
   settings in production). It is never in the React code and never committed to Git.
 
@@ -29,7 +37,8 @@ React (browser)  ->  Python API (FastAPI)  ->  Supabase (Postgres)
 ## Getting started (local)
 
 1. Copy `.env.example` to `.env` and fill in `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`.
-2. Create the table once in the Supabase SQL Editor (see `supabase/schema.sql`).
+2. Create the tables once in the Supabase SQL Editor: run `supabase/schema.sql` (reports)
+   and `supabase/auth.sql` (accounts).
 3. Start the Python API:
 
 ```bash
@@ -46,12 +55,18 @@ npm install
 npm run dev      # http://localhost:5173
 ```
 
+If Windows says port 8000 is forbidden (`WinError 10013`), use another port in both
+terminals, for example `uvicorn api.index:app --reload --port 8123` and, in PowerShell,
+`$env:API_PORT=8123; npm.cmd run dev`.
+
 Other scripts:
 
 ```bash
 npm run build      # production build into dist/
 npm run preview    # serve the production build
 npm run test:smoke # renders every screen and checks the expected content
+python -m pip install pytest httpx
+python -m pytest tests -q   # backend tests (accounts, sessions, reports) with a fake database
 ```
 
 ## Environment variables
@@ -60,6 +75,10 @@ npm run test:smoke # renders every screen and checks the expected content
 |------------------------|----------------------------------------------|---------------|
 | `SUPABASE_URL`         | `.env` locally, Vercel project settings      | Python API    |
 | `SUPABASE_SERVICE_KEY` | `.env` locally, Vercel project settings      | Python API    |
+| `SESSION_SECRET` (optional) | `.env` / Vercel project settings        | Python API    |
+
+`SESSION_SECRET` signs the session tokens. If it is not set, a signing key is derived from
+`SUPABASE_SERVICE_KEY`, so nothing extra is needed.
 
 `.env` is listed in `.gitignore`; `.env.example` shows the names without real values.
 
@@ -68,20 +87,22 @@ npm run test:smoke # renders every screen and checks the expected content
 | Method | Path                         | What it does                                          |
 |--------|------------------------------|-------------------------------------------------------|
 | GET    | `/api/health`                | Is the API up, and are the two variables present?     |
-| POST   | `/api/reports`               | Validates a report and inserts it into `reports`      |
-| GET    | `/api/reports?user_email=…`  | Returns that renter's 20 newest reports               |
+| POST   | `/api/auth/signup`           | Creates an account (checks the password rule) and logs in |
+| POST   | `/api/auth/login`            | Checks the password and returns a session token       |
+| POST   | `/api/reports`               | Needs the token. Validates a report and saves it under the token's email |
+| GET    | `/api/reports`               | Needs the token. Returns that renter's 20 newest reports |
 
 ## Screens
 
 | # | Screen                  | File                                  | Moves on when                              |
 |---|-------------------------|---------------------------------------|--------------------------------------------|
-| 1 | Login                   | `src/screens/LoginScreen.jsx`         | Any non-empty email + password → screen 2   |
+| 1 | Log in / Create account | `src/screens/LoginScreen.jsx`         | Valid log in or new account → screen 2      |
 | 2 | Report an issue         | `src/screens/ReportIssueScreen.jsx`   | Description + date → screen 3               |
 | 3 | Property & contact      | `src/screens/PropertyDetailsScreen.jsx` | Address + valid email → screen 4          |
 | 4 | Confirmation            | `src/screens/ConfirmationScreen.jsx`  | "Done" resets the form → screen 1           |
 | – | My reports              | `src/screens/MyReportsScreen.jsx`     | Loads saved reports from the database       |
 
-The logged-in email is shown in the header as `Signed in as …`. Screen 4 shows a
+The logged-in email is shown in the header as `Signed in as …`, with a **Log out** button. Screen 4 shows a
 `SuccessAlert` reading "Report submitted successfully" above the summary of screens 2–3.
 
 ## Project structure
@@ -94,6 +115,9 @@ vercel.json                    Sends /api/* to the Python function on Vercel
 index.html                     Vite entry HTML
 vite.config.js                 Vite + React + Tailwind plugins
 scripts/smoke-test.jsx         SSR render checks (npm run test:smoke)
+supabase/schema.sql            SQL for the reports table
+supabase/auth.sql              SQL for the app_users (accounts) table
+tests/test_api.py              Backend tests with an in-memory fake of Supabase
 src/
   main.jsx                     React root
   index.css                    Tailwind import + theme tokens
@@ -150,9 +174,11 @@ Defined in `src/index.css` and used as Tailwind utilities:
 
 ## Notes / limitations
 
-- The login is a demo: any email and password are accepted, and reports are filed under
-  the email typed in. A production version would use real authentication (for example
-  Supabase Auth) and Row Level Security policies tied to the signed-in user.
+- Accounts are a simple custom login (hashed passwords + signed session tokens) built in
+  the Python API. Next improvements: email verification, a "forgot password" flow, limits on
+  repeated wrong passwords, and moving to Supabase Auth with Row Level Security policies
+  tied to the signed-in user.
+- The session token is kept in memory only, so refreshing the page logs the renter out.
 - Validation is checked twice: inline in React, and again in the Python API.
 - The photo is never uploaded; only its name and size are stored.
 - Nothing is sent to a rental provider - this is a demo of the reporting workflow.

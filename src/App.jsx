@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { saveReport } from './api'
+import { saveReport, setSessionToken } from './api'
 import AppHeader from './components/AppHeader'
 import ConfirmationScreen from './screens/ConfirmationScreen'
 import LoginScreen from './screens/LoginScreen'
@@ -34,6 +34,7 @@ export default function App() {
   const [savedReport, setSavedReport] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [loginNotice, setLoginNotice] = useState('')
 
   function updateReport(field, value) {
     setReport((current) => ({ ...current, [field]: value }))
@@ -43,9 +44,28 @@ export default function App() {
     setContact((current) => ({ ...current, [field]: value }))
   }
 
+  /** Called after the Python API has accepted a log in or a new account. */
   function handleLogIn(credentials) {
     setAccount(credentials)
+    setLoginNotice('')
     setScreen(SCREENS.REPORT)
+  }
+
+  /** Forgets the session and returns to the login screen (optionally with a message). */
+  function handleSignOut(notice = '') {
+    setSessionToken(null)
+    setAccount(null)
+    setReport(EMPTY_REPORT)
+    setContact(EMPTY_CONTACT)
+    setSavedReport(null)
+    setSubmitError('')
+    setLoginNotice(typeof notice === 'string' ? notice : '')
+    setScreen(SCREENS.LOGIN)
+  }
+
+  /** The session ran out (or is invalid): ask the renter to log in again. */
+  function handleSessionExpired() {
+    handleSignOut('Your session has ended. Please log in again.')
   }
 
   /** Sends the finished report to the Python API, which saves it in Supabase. */
@@ -54,10 +74,14 @@ export default function App() {
     setSubmitError('')
 
     try {
-      const saved = await saveReport({ email: account.email, report, contact })
+      const saved = await saveReport({ report, contact })
       setSavedReport(saved)
       setScreen(SCREENS.CONFIRMATION)
     } catch (error) {
+      if (error.status === 401) {
+        handleSessionExpired()
+        return
+      }
       setSubmitError(error.message)
     } finally {
       setSubmitting(false)
@@ -65,12 +89,7 @@ export default function App() {
   }
 
   function handleDone() {
-    setReport(EMPTY_REPORT)
-    setContact(EMPTY_CONTACT)
-    setSavedReport(null)
-    setSubmitError('')
-    setAccount(null)
-    setScreen(SCREENS.LOGIN)
+    handleSignOut()
   }
 
   /** Starts a fresh report while staying signed in. */
@@ -87,17 +106,20 @@ export default function App() {
       <AppHeader
         currentStep={STEP_BY_SCREEN[screen] ?? null}
         signedInAs={account?.email ?? null}
+        onSignOut={account ? () => handleSignOut() : undefined}
       />
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6">
-        {screen === SCREENS.LOGIN && <LoginScreen onLogIn={handleLogIn} />}
+        {screen === SCREENS.LOGIN && (
+          <LoginScreen onLogIn={handleLogIn} notice={loginNotice} />
+        )}
 
         {screen === SCREENS.REPORT && (
           <ReportIssueScreen
             report={report}
             onChange={updateReport}
             onContinue={() => setScreen(SCREENS.DETAILS)}
-            onBack={() => setScreen(SCREENS.LOGIN)}
+            onBack={() => handleSignOut()}
             onViewReports={() => setScreen(SCREENS.REPORTS)}
           />
         )}
@@ -124,7 +146,11 @@ export default function App() {
         )}
 
         {screen === SCREENS.REPORTS && (
-          <MyReportsScreen email={account.email} onNewReport={handleNewReport} />
+          <MyReportsScreen
+            email={account.email}
+            onNewReport={handleNewReport}
+            onSessionExpired={handleSessionExpired}
+          />
         )}
       </main>
 
